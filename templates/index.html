@@ -1,0 +1,334 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="dark">
+  <title>{{ brand_name }}</title>
+  <meta name="description" content="{{ brand_tagline }}">
+  <link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='img/favicon.svg') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/app.css') }}">
+</head>
+<body>
+<!-- icon sprite ------------------------------------------------------------ -->
+<svg class="sprite" aria-hidden="true" focusable="false">
+  <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+  <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4.3-4.3"/></symbol>
+  <symbol id="i-send" viewBox="0 0 24 24"><path d="M4 12l16-8-6 8 6 8z"/></symbol>
+  <symbol id="i-trash" viewBox="0 0 24 24"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/></symbol>
+  <symbol id="i-refresh" viewBox="0 0 24 24"><path d="M20 11a8 8 0 10-2.6 5.9"/><path d="M20 4v7h-7"/></symbol>
+  <symbol id="i-close" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></symbol>
+  <symbol id="i-back" viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></symbol>
+  <symbol id="i-check" viewBox="0 0 24 24"><path d="M5 13l4 4 10-10"/></symbol>
+  <symbol id="i-alert" viewBox="0 0 24 24"><path d="M12 4l9 16H3z"/><path d="M12 10v4M12 17h.01"/></symbol>
+  <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><path d="M12 8v4l3 2"/></symbol>
+</svg>
+
+<!-- header ---------------------------------------------------------------- -->
+<header class="topbar">
+  <div class="topbar__brand">
+    <img class="topbar__logo"
+         src="{{ url_for('static', filename='img/logo-mark.svg') }}"
+         alt="" width="34" height="31">
+    <div class="topbar__names">
+      <span class="topbar__title">{{ brand_name }}</span>
+      <span class="topbar__tagline">{{ brand_tagline }}</span>
+    </div>
+  </div>
+
+  <div class="topbar__actions">
+    <button type="button" class="chip chip--status" id="health-chip"
+            title="Lakebase connection status" aria-live="polite">
+      <span class="dot dot--pending" id="health-dot"></span>
+      <span id="health-label">Connecting…</span>
+    </button>
+    <span class="chip chip--user" title="Signed-in user">{{ current_user }}</span>
+    <button type="button" class="btn btn--ghost btn--icon" id="refresh-btn"
+            title="Reload from Lakebase" aria-label="Reload from Lakebase">
+      <svg class="icon"><use href="#i-refresh"/></svg>
+    </button>
+    <button type="button" class="btn btn--primary" id="new-ticket-btn">
+      <svg class="icon"><use href="#i-plus"/></svg>
+      <span>New ticket</span>
+    </button>
+  </div>
+</header>
+
+<!-- connection banner ----------------------------------------------------- -->
+<div class="banner" id="banner" hidden>
+  <svg class="icon"><use href="#i-alert"/></svg>
+  <div class="banner__body">
+    <strong id="banner-title">Lakebase is unreachable</strong>
+    <span id="banner-detail"></span>
+  </div>
+  <button type="button" class="btn btn--ghost btn--sm" id="banner-retry">Retry</button>
+</div>
+
+<!-- statistics ------------------------------------------------------------ -->
+<section class="stats" id="stats" aria-label="Ticket statistics">
+  <article class="stat" data-stat="total">
+    <span class="stat__label">Total tickets</span>
+    <span class="stat__value">—</span>
+  </article>
+  <article class="stat stat--open" data-stat="open">
+    <span class="stat__label">Open</span>
+    <span class="stat__value">—</span>
+  </article>
+  <article class="stat stat--in_progress" data-stat="in_progress">
+    <span class="stat__label">In progress</span>
+    <span class="stat__value">—</span>
+  </article>
+  <article class="stat stat--resolved" data-stat="resolved">
+    <span class="stat__label">Resolved</span>
+    <span class="stat__value">—</span>
+  </article>
+  <article class="stat stat--attention" data-stat="needs_attention">
+    <span class="stat__label">Needs attention</span>
+    <span class="stat__value">—</span>
+    <span class="stat__hint">high &amp; urgent, still active</span>
+  </article>
+  <article class="stat" data-stat="avg_resolution_hours">
+    <span class="stat__label">Avg. resolution</span>
+    <span class="stat__value">—</span>
+    <span class="stat__hint">across resolved tickets</span>
+  </article>
+</section>
+
+<!-- workspace ------------------------------------------------------------- -->
+<main class="workspace" id="workspace">
+
+  <!-- list ------------------------------------------------------------- -->
+  <section class="panel panel--list" aria-label="Support tickets">
+    <div class="toolbar">
+      <div class="search">
+        <svg class="icon"><use href="#i-search"/></svg>
+        <input type="search" id="search-input" placeholder="Search tickets and messages"
+               autocomplete="off" aria-label="Search tickets and messages">
+      </div>
+
+      <div class="filters" id="status-filters" role="group" aria-label="Filter by status">
+        <!-- status chips injected here -->
+      </div>
+
+      <div class="filters filters--selects">
+        <label class="field field--inline">
+          <span class="field__label">Priority</span>
+          <select id="priority-filter"><option value="">Any</option></select>
+        </label>
+        <label class="field field--inline">
+          <span class="field__label">Category</span>
+          <select id="category-filter"><option value="">Any</option></select>
+        </label>
+        <label class="field field--inline">
+          <span class="field__label">Sort</span>
+          <select id="sort-select"></select>
+        </label>
+        <button type="button" class="btn btn--ghost btn--sm" id="clear-filters" hidden>
+          Clear filters
+        </button>
+      </div>
+
+      <p class="toolbar__count" id="result-count" aria-live="polite"></p>
+    </div>
+
+    <ul class="tickets" id="ticket-list"></ul>
+
+    <div class="empty" id="list-empty" hidden>
+      <img src="{{ url_for('static', filename='img/logo-mark.svg') }}" alt="" width="72" height="66">
+      <p class="empty__title">No tickets match these filters</p>
+      <p class="empty__hint">Clear the filters, or create the first ticket.</p>
+    </div>
+  </section>
+
+  <!-- detail ----------------------------------------------------------- -->
+  <section class="panel panel--detail" id="detail-panel" aria-label="Ticket detail">
+
+    <div class="detail-placeholder" id="detail-placeholder">
+      <img src="{{ url_for('static', filename='img/logo-mark.svg') }}" alt="" width="112" height="102">
+      <p class="empty__title">Select a ticket</p>
+      <p class="empty__hint">
+        Pick a ticket on the left to read its thread, reply, or change its status.
+      </p>
+    </div>
+
+    <article class="detail" id="detail" hidden>
+      <button type="button" class="btn btn--ghost btn--sm detail__back" id="detail-back">
+        <svg class="icon"><use href="#i-back"/></svg><span>All tickets</span>
+      </button>
+
+      <header class="detail__head">
+        <div class="detail__heading">
+          <span class="ticket-id" id="detail-id"></span>
+          <h1 class="detail__title" id="detail-title"></h1>
+          <p class="detail__description" id="detail-description"></p>
+        </div>
+        <div class="detail__pills" id="detail-pills"></div>
+      </header>
+
+      <div class="detail__controls">
+        <label class="field">
+          <span class="field__label">Status</span>
+          <select id="status-control"></select>
+        </label>
+        <label class="field">
+          <span class="field__label">Priority</span>
+          <select id="priority-control"></select>
+        </label>
+        <label class="field">
+          <span class="field__label">Category</span>
+          <select id="category-control"></select>
+        </label>
+        <button type="button" class="btn btn--danger btn--sm detail__delete" id="delete-btn">
+          <svg class="icon"><use href="#i-trash"/></svg><span>Delete</span>
+        </button>
+      </div>
+
+      <dl class="meta" id="detail-meta"></dl>
+
+      <section class="thread" aria-label="Conversation">
+        <h2 class="section-title">
+          Conversation <span class="count" id="message-count"></span>
+        </h2>
+        <ol class="messages" id="messages"></ol>
+      </section>
+
+      <form class="composer" id="composer" novalidate>
+        <label class="field">
+          <span class="field__label">Add a message</span>
+          <textarea id="message-input" rows="3"
+                    placeholder="Write a reply…" maxlength="5000"></textarea>
+          <span class="field__error" id="message-error" hidden></span>
+        </label>
+        <div class="composer__foot">
+          <label class="field field--inline">
+            <span class="field__label">Reply as</span>
+            <select id="role-select"></select>
+          </label>
+          <span class="composer__counter" id="message-counter">0 / 5000</span>
+          <button type="submit" class="btn btn--primary" id="send-btn">
+            <svg class="icon"><use href="#i-send"/></svg><span>Send message</span>
+          </button>
+        </div>
+      </form>
+    </article>
+  </section>
+</main>
+
+<footer class="footer">
+  <span>Operational data stored in <strong>Databricks Lakebase</strong> (Postgres)</span>
+  <span class="footer__sep">·</span>
+  <span id="footer-target">schema loading…</span>
+</footer>
+
+<!-- new ticket modal ------------------------------------------------------ -->
+<div class="modal" id="new-modal" hidden role="dialog" aria-modal="true"
+     aria-labelledby="new-modal-title">
+  <div class="modal__backdrop" data-close-modal></div>
+  <div class="modal__panel">
+    <header class="modal__head">
+      <h2 id="new-modal-title">Create a support ticket</h2>
+      <button type="button" class="btn btn--ghost btn--icon" data-close-modal
+              aria-label="Close">
+        <svg class="icon"><use href="#i-close"/></svg>
+      </button>
+    </header>
+
+    <form id="new-form" class="modal__body" novalidate>
+      <label class="field">
+        <span class="field__label">Title <span class="req">required</span></span>
+        <input type="text" id="new-title" maxlength="200"
+               placeholder="Short summary of the problem">
+        <span class="field__error" data-error-for="title" hidden></span>
+      </label>
+
+      <label class="field">
+        <span class="field__label">Description</span>
+        <textarea id="new-description" rows="3" maxlength="5000"
+                  placeholder="What happened, and what did you expect?"></textarea>
+        <span class="field__error" data-error-for="description" hidden></span>
+      </label>
+
+      <div class="field-row">
+        <label class="field">
+          <span class="field__label">Status</span>
+          <select id="new-status"></select>
+        </label>
+        <label class="field">
+          <span class="field__label">Priority</span>
+          <select id="new-priority"></select>
+        </label>
+        <label class="field">
+          <span class="field__label">Category</span>
+          <select id="new-category"></select>
+        </label>
+      </div>
+
+      <div class="field-row">
+        <label class="field">
+          <span class="field__label">Reported by</span>
+          <input type="text" id="new-created-by" maxlength="255">
+          <span class="field__error" data-error-for="created_by" hidden></span>
+        </label>
+        <label class="field">
+          <span class="field__label">Assign to <span class="opt">optional</span></span>
+          <input type="text" id="new-assigned-to" maxlength="255"
+                 placeholder="agent@example.com">
+          <span class="field__error" data-error-for="assigned_to" hidden></span>
+        </label>
+      </div>
+
+      <label class="field">
+        <span class="field__label">First message <span class="opt">optional</span></span>
+        <textarea id="new-message" rows="3" maxlength="5000"
+                  placeholder="Opens the conversation thread"></textarea>
+        <span class="field__error" data-error-for="first_message" hidden></span>
+      </label>
+
+      <p class="form-error" id="new-form-error" hidden></p>
+
+      <footer class="modal__foot">
+        <button type="button" class="btn btn--ghost" data-close-modal>Cancel</button>
+        <button type="submit" class="btn btn--primary" id="create-btn">
+          <svg class="icon"><use href="#i-plus"/></svg><span>Create ticket</span>
+        </button>
+      </footer>
+    </form>
+  </div>
+</div>
+
+<!-- delete confirmation --------------------------------------------------- -->
+<div class="modal" id="confirm-modal" hidden role="dialog" aria-modal="true"
+     aria-labelledby="confirm-title">
+  <div class="modal__backdrop" data-close-modal></div>
+  <div class="modal__panel modal__panel--narrow">
+    <header class="modal__head">
+      <h2 id="confirm-title">Delete this ticket?</h2>
+    </header>
+    <div class="modal__body">
+      <p class="confirm__lead" id="confirm-lead"></p>
+      <p class="confirm__warn">
+        <svg class="icon"><use href="#i-alert"/></svg>
+        This permanently removes the ticket and its messages from Lakebase.
+        It cannot be undone.
+      </p>
+      <label class="field">
+        <span class="field__label">
+          Type <code id="confirm-word">DELETE</code> to confirm
+        </span>
+        <input type="text" id="confirm-input" autocomplete="off" placeholder="DELETE">
+      </label>
+      <footer class="modal__foot">
+        <button type="button" class="btn btn--ghost" data-close-modal>Keep ticket</button>
+        <button type="button" class="btn btn--danger" id="confirm-delete-btn" disabled>
+          <svg class="icon"><use href="#i-trash"/></svg><span>Delete permanently</span>
+        </button>
+      </footer>
+    </div>
+  </div>
+</div>
+
+<div class="toasts" id="toasts" aria-live="polite" aria-atomic="false"></div>
+
+<script src="{{ url_for('static', filename='js/app.js') }}"></script>
+</body>
+</html>

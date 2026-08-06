@@ -1,0 +1,6 @@
+flask>=3.0.3
+waitress>=3.0.0
+sqlalchemy>=2.0.30
+psycopg2-binary>=2.9.9
+databricks-sdk>=0.40.0
+python-dotenv>=1.0.1

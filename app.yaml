@@ -1,0 +1,54 @@
+# ---------------------------------------------------------------------------
+# Databricks Apps configuration.
+#
+# The Lakebase connection string is NOT in this file and must never be. It is
+# read from a Databricks secret at runtime via the `valueFrom` reference below,
+# which resolves to a Secret resource attached to this app.
+#
+#   1. Store the connection string as a secret:
+#        databricks secrets create-scope nexus-support
+#        databricks secrets put-secret nexus-support lakebase-url
+#   2. On the app: Edit -> Resources -> Add resource -> Secret
+#        scope = nexus-support, key = lakebase-url,
+#        resource key = lakebase-url        <- must match `valueFrom` below
+#        permission = Can read
+#
+# If you would rather not manage a connection string at all, delete the
+# LAKEBASE_URL block below and instead attach the Lakebase instance as a
+# Database resource: Databricks then injects PGHOST/PGPORT/PGDATABASE/PGUSER/
+# PGSSLMODE and the app mints its own short-lived token from its service
+# principal identity. Both paths are supported; LAKEBASE_URL wins if present.
+# ---------------------------------------------------------------------------
+
+command:
+  - python
+  - app.py
+
+env:
+  # Postgres connection string, resolved from the Secret resource keyed
+  # "lakebase-url". Remove this entry if you use the Database-resource path.
+  - name: LAKEBASE_URL
+    valueFrom: lakebase-url
+
+  # Schema created and used inside the Lakebase database.
+  - name: LAKEBASE_SCHEMA
+    value: "support"
+
+  # Create the schema/tables on boot if they are not there yet. Idempotent.
+  - name: LAKEBASE_AUTO_MIGRATE
+    value: "true"
+
+  # Load the demo tickets only while the tickets table is still empty.
+  # Set to "false" once you are working with real data.
+  - name: LAKEBASE_SEED_ON_EMPTY
+    value: "true"
+
+  - name: APP_BRAND_NAME
+    value: "Nexus Support"
+
+  - name: APP_BRAND_TAGLINE
+    value: "Support desk on Databricks Lakebase"
+
+  # Write a system message into the thread whenever a status changes.
+  - name: APP_LOG_STATUS_CHANGES
+    value: "true"
