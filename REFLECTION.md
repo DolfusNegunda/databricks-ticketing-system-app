@@ -131,6 +131,7 @@ sql/001_schema.sql         tables, FK, indexes, trigger, view, CDF readiness
 sql/002_seed.sql           idempotent demo data
 static/                    css, js, logo/favicon SVGs
 templates/index.html
+notebooks/setup_secrets.py Databricks notebook that stores the connection string
 scripts/                   check_api, check_sql, check_connection, verify_lakebase
 docs/                      your two screenshots
 ```

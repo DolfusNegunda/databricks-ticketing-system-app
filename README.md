@@ -225,6 +225,24 @@ python app.py     # http://localhost:8000
 
 ### Step 3 — Store the connection string as a Databricks secret
 
+**Easiest: run [`notebooks/setup_secrets.py`](notebooks/setup_secrets.py) in your
+workspace.** It is a Databricks notebook — open it from the Git folder and it
+renders with its instructions in place. No CLI install, and you are already
+authenticated.
+
+> It lives in this repo, so do **step 4** (Git folder) first and then come back —
+> or just paste its two code cells into a scratch notebook.
+
+It creates the `nexus-support` scope, takes the connection string through a
+widget rather than a code cell (code cells are saved in revision history),
+refuses to store a blank or malformed value, verifies the round trip, and prints
+the host/user/database it points at — never the password.
+
+> Run **Cell 1**, paste the string into the box that appears at the top of the
+> notebook, then run **Cell 2**. Delete the notebook afterwards.
+
+**Alternative: the CLI**, if you have it installed.
+
 ```bash
 databricks secrets create-scope nexus-support
 databricks secrets put-secret nexus-support lakebase-url
@@ -518,6 +536,10 @@ static/
   css/app.css              the design system
   js/app.js                frontend, no build step, no dependencies
   img/                     logo.svg, logo-mark.svg, favicon.svg
+
+notebooks/
+  setup_secrets.py         Databricks notebook: store the connection string as
+                           a secret (run once, before deploying)
 
 scripts/
   check_api.py             offline route/validation/DSN-parsing checks
