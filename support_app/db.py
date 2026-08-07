@@ -287,8 +287,6 @@ def get_engine() -> Engine:
         connect_args: dict[str, object] = {
             "connect_timeout": 10,
             "application_name": config.PGAPPNAME,
-            # Resolve unqualified table names against our schema.
-            "options": f"-c search_path={config.LAKEBASE_SCHEMA},public",
         }
         if "sslmode" not in url.query:
             connect_args["sslmode"] = config.PGSSLMODE
@@ -311,6 +309,24 @@ def get_engine() -> Engine:
                 """Attach a fresh OAuth token as the password on every connect."""
                 cparams["password"] = _tokens.token()
                 return None
+
+        @event.listens_for(engine, "connect", insert=True)
+        def _set_search_path(dbapi_connection, _connection_record):  # noqa: ANN001
+            """Point unqualified table names at our schema.
+
+            This deliberately uses a SET statement rather than the libpq
+            ``options=-c search_path=...`` connect parameter. Lakebase sits
+            behind a connection proxy that reserves ``options`` for its own
+            endpoint routing, so a search_path passed that way is silently
+            dropped -- and every unqualified query then fails with
+            "relation does not exist" even though the tables are right there.
+            A plain SET is ordinary SQL and survives any proxy.
+            """
+            previous_autocommit = dbapi_connection.autocommit
+            dbapi_connection.autocommit = True
+            with dbapi_connection.cursor() as cursor:
+                cursor.execute(f'SET search_path TO "{config.LAKEBASE_SCHEMA}", public')
+            dbapi_connection.autocommit = previous_autocommit
 
         _engine = engine
         summary = target_summary()
@@ -349,7 +365,16 @@ def _render_sql(filename: str) -> str:
 
 
 def _tickets_is_empty(connection) -> bool:  # noqa: ANN001
-    total = connection.execute(text("SELECT COUNT(*) FROM tickets")).scalar_one()
+    """Schema-qualified on purpose.
+
+    This runs inside the bootstrap transaction, moments after CREATE SCHEMA. If
+    it relied on search_path and that were not in effect, the lookup would fail
+    and roll back every table just created -- leaving an empty database and an
+    error pointing at the wrong thing. The schema name is validated in config.
+    """
+    total = connection.execute(
+        text(f"SELECT COUNT(*) FROM {config.LAKEBASE_SCHEMA}.tickets")
+    ).scalar_one()
     return total == 0
 
 

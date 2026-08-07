@@ -97,11 +97,14 @@
 
   // ------------------------------------------------------------- transport --
   class ApiFailure extends Error {
-    constructor(message, { code = 'error', fields = {}, status = 0 } = {}) {
+    constructor(message, { code = 'error', fields = {}, status = 0, payload = null } = {}) {
       super(message);
       this.code = code;
       this.fields = fields;
       this.status = status;
+      // Full response body. /api/health returns a diagnostic payload even when
+      // it fails, and the root cause lives in there rather than in `message`.
+      this.payload = payload;
     }
   }
 
@@ -149,6 +152,7 @@
         code: err.code,
         fields: err.fields || {},
         status: response.status,
+        payload,
       });
     }
     return payload;
@@ -579,10 +583,32 @@
         `on ${lb.instance || lb.host || 'lakebase'} (${lb.auth_mode})`;
     } catch (error) {
       dot.className = 'dot dot--bad';
-      label.textContent = 'Lakebase unavailable';
-      $('banner-detail').textContent = error.message;
       banner.hidden = false;
-      $('footer-target').textContent = 'no Lakebase connection';
+
+      // If we reached the database but the schema was never applied, the
+      // startup bootstrap error is the root cause -- "relation does not exist"
+      // is only the symptom, and reporting it sends people down the wrong path.
+      const bootstrap = error.payload?.bootstrap;
+      const connected = Boolean(error.payload?.lakebase?.host);
+
+      if (bootstrap && bootstrap.attempted && bootstrap.ok === false && bootstrap.error) {
+        label.textContent = 'Schema not created';
+        $('banner-title').textContent =
+          'Connected to Lakebase, but the tables were never created';
+        $('banner-detail').textContent =
+          `${bootstrap.error} — retry with POST /api/admin/bootstrap?seed=true`;
+      } else {
+        label.textContent = 'Lakebase unavailable';
+        $('banner-title').textContent = connected
+          ? 'Lakebase reachable, but the request failed'
+          : 'Lakebase is unreachable';
+        $('banner-detail').textContent = error.message;
+      }
+
+      const lb = error.payload?.lakebase;
+      $('footer-target').textContent = lb?.host
+        ? `${lb.database}.${lb.schema} on ${lb.host} (${lb.auth_mode})`
+        : 'no Lakebase connection';
     }
   }
 
@@ -784,8 +810,21 @@
     });
     $('health-chip').addEventListener('click', checkHealth);
     $('banner-retry').addEventListener('click', async () => {
+      const button = $('banner-retry');
+      busy(button, true);
+      try {
+        // Re-applying the schema is idempotent and is the fix for the common
+        // case (bootstrap ran before the credential was available), so retry
+        // means retry the thing that failed -- not just re-check.
+        const result = await request('/admin/bootstrap?seed=true', { method: 'POST' });
+        toast('ok', 'Schema applied', result.seeded ? 'Demo tickets loaded.' : 'Tables are ready.');
+      } catch (error) {
+        reportError(error, 'Could not apply the schema');
+      } finally {
+        busy(button, false);
+      }
       await checkHealth();
-      await refreshAll();
+      await refreshAll({ keepSelection: false });
     });
     $('clear-filters').addEventListener('click', clearFilters);
     $('detail-back').addEventListener('click', () => {

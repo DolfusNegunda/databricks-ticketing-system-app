@@ -125,14 +125,19 @@ LEFT JOIN (
 -- images into Unity Catalog Delta tables, so the same operational rows become
 -- available to analytics and to downstream AI agents without an ETL job.
 -- ---------------------------------------------------------------------------
--- Wrapped so a non-owner role cannot fail the whole bootstrap transaction.
+-- This is an optimisation, not a requirement: the app works fine without it.
+-- WHEN OTHERS is deliberate. Anything raised here runs in a subtransaction and
+-- is swallowed, so a managed instance that restricts REPLICA IDENTITY -- for
+-- any reason, with any SQLSTATE -- cannot roll back the tables above.
 DO $cdf$
 BEGIN
     ALTER TABLE __SCHEMA__.tickets               REPLICA IDENTITY FULL;
     ALTER TABLE __SCHEMA__.ticket_messages       REPLICA IDENTITY FULL;
     ALTER TABLE __SCHEMA__.ticket_status_history REPLICA IDENTITY FULL;
+    RAISE NOTICE 'REPLICA IDENTITY FULL set: tables are ready for Lakebase CDF.';
 EXCEPTION
-    WHEN insufficient_privilege THEN
-        RAISE NOTICE 'Skipped REPLICA IDENTITY FULL: current role does not own these tables.';
+    WHEN OTHERS THEN
+        RAISE NOTICE 'Skipped REPLICA IDENTITY FULL (%): CDF publishing may show '
+                     'only changed columns. Everything else is unaffected.', SQLERRM;
 END;
 $cdf$;
