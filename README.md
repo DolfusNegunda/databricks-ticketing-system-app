@@ -6,6 +6,11 @@
     Flask + vanilla JS &nbsp;·&nbsp; Lakebase (managed Postgres) &nbsp;·&nbsp;
     Deployed as a Databricks App &nbsp;·&nbsp; No stored database password
   </p>
+  <p>
+    <a href="https://ticketing-system-app-7474650241444565.aws.databricksapps.com/"><strong>Live app</strong></a>
+    &nbsp;·&nbsp; <a href="REFLECTION.md">Reflection</a>
+    &nbsp;·&nbsp; <a href="SUBMISSION.md">Submission guide</a>
+  </p>
 </div>
 
 ---
@@ -43,12 +48,13 @@ same rows can flow into Unity Catalog.
 
 ## Screenshots
 
-> Add your own after deploying — these paths are referenced by the submission checklist.
-
 | | |
 | --- | --- |
 | `docs/screenshot-app.png` | The deployed application |
 | `docs/screenshot-lakebase.png` | The Lakebase tables and sample records |
+
+Capture instructions and the exact SQL are in
+[SUBMISSION.md](SUBMISSION.md#step-1--take-the-two-screenshots).
 
 ## Architecture
 
@@ -214,7 +220,7 @@ ticket and confirms the cascade. It cleans up after itself and leaves the demo
 data in place.
 
 Take your **Lakebase screenshot** now — the tables exist and have rows. The exact
-queries to run are in [REFLECTION.md](REFLECTION.md#screenshots-worth-taking).
+queries to run are in [SUBMISSION.md](SUBMISSION.md#step-1--take-the-two-screenshots).
 
 You can also run the app locally at this point to see it working before you
 deploy:
