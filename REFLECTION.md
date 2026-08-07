@@ -1,4 +1,4 @@
-# Reflection — Day 1 Homework
+# Reflection - Day 1 Homework
 
 Nexus Support, a Lakebase-powered support application · Dolfus Negunda
 
@@ -15,7 +15,7 @@ that survives managed infrastructure: my app deployed, created its tables, and
 then could not query them, because Lakebase sits behind a proxy that silently
 ignores the libpq options parameter I had used to set search_path. The error
 blamed a missing table when the real cause was a missing setting, so I rewrote
-the failure paths to explain themselves — the app now starts in a degraded state
+the failure paths to explain themselves - the app now starts in a degraded state
 and reports the underlying error on /api/health instead of crash-looping.
 
 **How is Lakebase different from storing this data in a traditional analytics
@@ -32,10 +32,5 @@ Change Data Feed as the bridge that publishes it to analytics.
 **What feature would you add next?**
 
 An AI triage agent that reads a ticket thread and proposes a priority, category
-and draft reply — every action in the UI is already a REST endpoint with one
+and draft reply - every action in the UI is already a REST endpoint with one
 consistent error format, so the agent's tool surface already exists.
-
----
-
-*Five sentences total: two on the difficulty, two on the difference, one on the
-next feature.*
