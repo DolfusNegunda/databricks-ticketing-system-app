@@ -284,7 +284,10 @@ def get_engine() -> Engine:
 
         url = _build_url()
         connect_args: dict[str, object] = {
-            "connect_timeout": 10,
+            # Lakebase compute endpoints scale to zero when idle, and the first
+            # connection after a suspend has to wait for the endpoint to wake.
+            # 10s was tight enough to turn a cold start into a hard failure.
+            "connect_timeout": 30,
             "application_name": config.PGAPPNAME,
         }
         if "sslmode" not in url.query:

@@ -7,8 +7,9 @@ neither the routes nor the repository need try/except noise.
 from __future__ import annotations
 
 import logging
+from pathlib import Path
 
-from flask import Flask, jsonify, request
+from flask import Flask, jsonify, request, url_for
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from werkzeug.exceptions import HTTPException
 
@@ -73,6 +74,30 @@ def create_app() -> Flask:
     )
     app.json.sort_keys = False
     app.config["SEND_FILE_MAX_AGE_DEFAULT"] = 0 if config.DEBUG else 3600
+
+    @app.context_processor
+    def _asset_helpers() -> dict[str, object]:
+        """Cache-bust static assets by content mtime.
+
+        Assets are cached for an hour, which is right for performance and wrong
+        for deploys: without a changing URL the browser keeps running the
+        previous app.js after a redeploy, so a shipped fix appears not to have
+        landed. A redeploy rewrites the files, the mtime changes, and the URL
+        changes with it.
+        """
+
+        def asset_url(filename: str) -> str:
+            stamp = 0
+            if app.static_folder:
+                try:
+                    stamp = int(
+                        (Path(app.static_folder) / filename).stat().st_mtime
+                    )
+                except OSError:
+                    log.debug("No mtime for static asset %s", filename)
+            return url_for("static", filename=filename, v=stamp)
+
+        return {"asset_url": asset_url}
 
     from .routes import api, ui
 

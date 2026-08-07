@@ -602,7 +602,12 @@
         $('banner-title').textContent = connected
           ? 'Lakebase reachable, but the request failed'
           : 'Lakebase is unreachable';
-        $('banner-detail').textContent = error.message;
+        // Never render an empty reason: a banner that says something is broken
+        // without saying what is worse than no banner at all.
+        $('banner-detail').textContent =
+          error.message ||
+          `The health check failed with HTTP ${error.status || '(no response)'}. ` +
+          'Open /api/health directly for the full diagnostic.';
       }
 
       const lb = error.payload?.lakebase;

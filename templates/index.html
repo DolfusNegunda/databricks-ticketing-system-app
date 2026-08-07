@@ -7,7 +7,7 @@
   <title>{{ brand_name }}</title>
   <meta name="description" content="{{ brand_tagline }}">
   <link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='img/favicon.svg') }}">
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/app.css') }}">
+  <link rel="stylesheet" href="{{ asset_url('css/app.css') }}">
 </head>
 <body>
 <!-- icon sprite ------------------------------------------------------------ -->
@@ -329,6 +329,6 @@
 
 <div class="toasts" id="toasts" aria-live="polite" aria-atomic="false"></div>
 
-<script src="{{ url_for('static', filename='js/app.js') }}"></script>
+<script src="{{ asset_url('js/app.js') }}"></script>
 </body>
 </html>
