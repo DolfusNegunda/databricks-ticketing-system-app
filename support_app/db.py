@@ -23,7 +23,6 @@ from datetime import datetime, timedelta, timezone
 from sqlalchemy import create_engine, event, text
 from sqlalchemy.engine import Engine
 from sqlalchemy.engine.url import URL, make_url
-from sqlalchemy.exc import SQLAlchemyError
 
 from . import config
 
@@ -378,6 +377,23 @@ def _tickets_is_empty(connection) -> bool:  # noqa: ANN001
     return total == 0
 
 
+def _run_sql_script(connection, filename: str) -> None:  # noqa: ANN001
+    """Execute a multi-statement .sql file verbatim, on the raw driver cursor.
+
+    Not ``exec_driver_sql``: for a statement with no parameters SQLAlchemy still
+    hands the driver an empty immutabledict, and psycopg2's C extension rejects
+    that as a non-sequence ("immutabledict is not a sequence"). Going straight
+    to the DBAPI cursor passes no parameters at all, which also means psycopg2
+    performs no %-interpolation on the script body.
+
+    The cursor comes from this Connection's own DBAPI connection, so the work
+    stays inside the surrounding transaction.
+    """
+    sql = _render_sql(filename)
+    with connection.connection.cursor() as cursor:
+        cursor.execute(sql)
+
+
 def bootstrap(force_seed: bool = False) -> dict[str, object]:
     """Apply the schema and, when the table is empty, the demo data.
 
@@ -387,14 +403,14 @@ def bootstrap(force_seed: bool = False) -> dict[str, object]:
     result: dict[str, object] = {"schema_applied": False, "seeded": False}
 
     with engine.begin() as connection:
-        connection.exec_driver_sql(_render_sql("001_schema.sql"))
+        _run_sql_script(connection, "001_schema.sql")
         result["schema_applied"] = True
 
         should_seed = force_seed or (
             config.SEED_ON_EMPTY and _tickets_is_empty(connection)
         )
         if should_seed:
-            connection.exec_driver_sql(_render_sql("002_seed.sql"))
+            _run_sql_script(connection, "002_seed.sql")
             result["seeded"] = not _tickets_is_empty(connection)
 
     log.info("Lakebase bootstrap complete: %s", result)
@@ -421,9 +437,16 @@ def ensure_ready() -> dict[str, object]:
 
         try:
             _bootstrap_state.update(ok=True, error=None, **bootstrap())
-        except (LakebaseUnavailable, SQLAlchemyError, OSError) as exc:
+        except Exception as exc:
+            # Intentionally bare. This runs during create_app(), so ANY escaping
+            # exception takes the whole process down at startup -- which is the
+            # exact opposite of this function's purpose. A narrower tuple once
+            # let a TypeError through and crashed the deployment instead of
+            # letting it come up degraded and report the cause on /api/health.
             log.exception("Lakebase bootstrap failed")
-            _bootstrap_state.update(ok=False, error=str(exc))
+            _bootstrap_state.update(
+                ok=False, error=f"{type(exc).__name__}: {exc}"
+            )
 
         return dict(_bootstrap_state)
 

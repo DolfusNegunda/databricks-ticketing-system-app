@@ -19,7 +19,28 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parent.parent
+
+def _project_root() -> Path:
+    """Locate the repository root.
+
+    __file__ is undefined when this script is pasted into a notebook cell, so
+    fall back to walking up from the working directory looking for the package.
+    """
+    try:
+        return Path(__file__).resolve().parent.parent
+    except NameError:
+        start = Path.cwd().resolve()
+        for directory in (start, *start.parents):
+            if (directory / "support_app").is_dir():
+                return directory
+        raise SystemExit(
+            f"Could not find the project root from {start}. Run this from "
+            "inside the repository, or set ROOT to the folder holding "
+            "support_app/."
+        )
+
+
+ROOT = _project_root()
 sys.path.insert(0, str(ROOT))
 
 from sqlalchemy import text  # noqa: E402
@@ -51,7 +72,7 @@ def scalar(sql: str, **params):
 
 # ---------------------------------------------------------------------------
 print("Lakebase target:")
-for key, value in config.connection_summary().items():
+for key, value in db.target_summary().items():
     print(f"  {key:>10}: {value}")
 
 print("\n== connect and bootstrap ==")

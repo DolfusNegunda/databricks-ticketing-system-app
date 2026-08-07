@@ -10,7 +10,6 @@ import logging
 from typing import Any, Iterable
 
 from flask import Blueprint, jsonify, render_template, request
-from sqlalchemy.exc import SQLAlchemyError
 
 from . import config, db, repository
 from .errors import (
@@ -324,11 +323,12 @@ def run_bootstrap():
         return jsonify(db.bootstrap(force_seed=force_seed))
     except db.LakebaseUnavailable as exc:
         raise ServiceUnavailableError(str(exc)) from exc
-    except SQLAlchemyError as exc:
-        # Deliberately NOT re-raised: the generic SQLAlchemyError handler hides
-        # the database's own message, and this endpoint exists precisely to
-        # show it. The driver error is what tells you whether the schema failed
-        # on a missing GRANT, a restricted statement, or something else.
+    except Exception as exc:
+        # Deliberately broad and deliberately NOT re-raised: the generic error
+        # handlers hide the underlying message, and this endpoint exists
+        # precisely to show it. Whatever went wrong -- a missing GRANT, a
+        # restricted statement, a driver type error -- the operator needs to
+        # read it, not a sanitised summary.
         log.exception("Manual bootstrap failed")
         raise ApiError(
             f"The schema could not be applied: {getattr(exc, 'orig', exc)}",
