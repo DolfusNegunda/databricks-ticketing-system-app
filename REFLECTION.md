@@ -1,84 +1,82 @@
-# Reflection & submission
+# Reflection & submission guide
 
-> Draft in your voice — edit freely before submitting. The five numbered
-> sentences below are the deliverable; everything after them is supporting
-> detail you can draw on if asked.
+---
 
-## Reflection (5 sentences)
+# PART 1 — The reflection (paste this)
 
-The hardest part was authentication rather than anything to do with tickets:
-Lakebase will hand you two things that both look like a connection string — a
-generated OAuth token and a native Postgres role password — and only the second
-one is still working an hour later, which is the kind of bug that surfaces after
-the demo rather than during it. Getting that right also meant keeping the string
-out of Git entirely by loading it from a Databricks secret through `app.yaml`'s
-`valueFrom`, percent-encoding the special characters in the password, and
-recycling the connection pool below the credential's lifetime so a pooled socket
-is never older than the credential that opened it. Lakebase differs from a
-traditional analytics table because it is genuinely transactional Postgres —
-`ticket_messages.ticket_id` is a real enforced foreign key with `ON DELETE
-CASCADE`, statuses and priorities are `CHECK` constraints the database refuses to
-violate, and flipping one ticket to `in_progress` is a single-row `UPDATE` that
-commits in milliseconds. The same operation against a Delta analytics table would
-be a `MERGE` that rewrites files, and Delta would happily accept an orphaned
-message or a misspelled status because it enforces neither key relationships nor
-value domains. That difference is exactly the point: Lakebase is where the app's
-live state belongs, and Change Data Feed is the bridge that publishes those rows
-into Unity Catalog for analytics without an ETL job — which is why I set
-`REPLICA IDENTITY FULL` on all three tables up front. The feature I would add
-next is an AI triage agent that reads a new ticket's thread and proposes a
-priority, category and draft reply, which is why every capability in the UI is
-also a plain REST endpoint with one consistent error shape — the agent's tool
-surface already exists.
+> Five sentences, written from what actually happened building and deploying
+> this. Edit the wording to sound like you before submitting.
 
-## Submission checklist
+The most difficult part had nothing to do with tickets or the UI: it was the
+seam between my application and Lakebase's managed infrastructure, where my
+schema and API passed every offline check and then failed on first deploy
+because the app created its tables and immediately could not query them.
+Lakebase runs behind a connection proxy that silently drops the libpq `options`
+parameter I was using to set `search_path`, so an unqualified `SELECT` could not
+resolve a table created one statement earlier, and the whole bootstrap
+transaction rolled back — leaving an error that blamed a missing table when the
+real cause was a missing setting. That taught me to make failures
+self-describing rather than merely handled: I moved `search_path` to a plain
+`SET` statement, schema-qualified the bootstrap so it can never depend on it,
+and made the app start in a degraded state that reports the underlying error on
+`/api/health` instead of crash-looping. Lakebase differs from a traditional
+analytics table because it is genuinely transactional Postgres —
+`ticket_messages.ticket_id` is an enforced foreign key with `ON DELETE CASCADE`,
+statuses and priorities are `CHECK` constraints the database refuses to violate,
+and moving a ticket to `in_progress` is a single-row `UPDATE` that commits in
+milliseconds, whereas the same change against a Delta table would be a `MERGE`
+that rewrites files, and Delta would happily accept an orphaned message or a
+misspelled status because it enforces neither key relationships nor value
+domains. The two are complements rather than substitutes, which is why I set
+`REPLICA IDENTITY FULL` up front so Change Data Feed can publish these rows into
+Unity Catalog as `lb_*_history` Delta tables with no ETL job — and the feature I
+would add next is an AI triage agent that reads a new ticket's thread and
+proposes a priority, category and draft reply, which is why every capability in
+the UI is also a REST endpoint with one consistent error envelope, so the
+agent's tool surface already exists.
 
-- [ ] **Databricks App URL** — from the app's page in **Compute → Apps**
-- [ ] **Source code, zipped** — see the command below
-- [ ] **Screenshot of the deployed application** — save as `docs/screenshot-app.png`
-- [ ] **Screenshot of the Lakebase tables and sample records** — save as
-      `docs/screenshot-lakebase.png`
-- [ ] **Reflection** — the five sentences above
-- [ ] Confirm no passwords, connection strings, API keys or secret values appear
-      anywhere in the zip. The connection string lives only in your local `.env`
-      (git-ignored) and in the Databricks secret scope — `app.yaml` holds just
-      the secret's *name*, and `env.example` holds no values. Quick proof:
+### If you need the three answers separately
 
-      ```bash
-      git grep -nE "postgresql://[^<]" -- . ; echo "exit $? (1 = clean)"
-      ```
+**What was the most difficult part?** Authentication and connectivity, not
+application logic. Everything passed offline; every real failure was in the seam
+between the app and managed infrastructure — a proxy dropping the `search_path`
+parameter, a driver rejecting SQLAlchemy's empty parameter object, a too-narrow
+`except` clause turning a recoverable bootstrap error into a crash loop. The fix
+in each case was to make the failure explain itself.
 
-### Zipping the source
+**How is Lakebase different from a traditional analytics table?** It is OLTP
+Postgres, so it enforces things Delta does not: a real foreign key with
+`ON DELETE CASCADE`, `CHECK` constraints on status/priority/category, and
+single-row `UPDATE`s that commit in milliseconds instead of a `MERGE` that
+rewrites files. Lakebase holds the app's live state; Delta is for analysing it,
+and CDF is the bridge between them.
 
-Exclude the virtualenv, caches and any local `.env`:
+**What feature would you add next?** An AI triage agent that reads a thread and
+proposes priority, category and a draft reply. The REST API and its consistent
+error envelope were built to be that agent's tool surface.
 
-```powershell
-# from the repository root
-$exclude = @('.venv', '__pycache__', '.git', '.env')
-Get-ChildItem -Recurse -Force |
-  Where-Object { $n = $_.FullName; -not ($exclude | Where-Object { $n -like "*\$_*" }) } |
-  Compress-Archive -DestinationPath ..\nexus-support-source.zip -Force
-```
+---
 
-Simplest reliable alternative, if the repo is committed to Git:
+# PART 2 — Finalising your submission
 
-```bash
-git archive --format=zip --output=../nexus-support-source.zip HEAD
-```
+## Step 1 — Take the two screenshots
 
-`git archive` only includes committed, non-ignored files, so `.venv` and `.env`
-cannot leak into the zip.
+**Screenshot A — the deployed application.** Open a ticket first, so one image
+shows the list, status filter chips with counts, the six statistic tiles, the
+message thread and the status control together. Make sure the header chip reads
+**Lakebase connected**. Save as `docs/screenshot-app.png`.
 
-### Screenshots worth taking
-
-**Application** — the two-pane view with a ticket selected, so one image shows
-the list, the status filter chips with counts, the statistics tiles, the message
-thread and the status control together. The header chip reading *Lakebase
-connected* is worth having in frame.
-
-**Lakebase** — in a SQL editor or notebook against the instance:
+**Screenshot B — the Lakebase tables and records.** In a SQL editor connected to
+your Lakebase instance, run these three and capture the results:
 
 ```sql
+-- 1. the tables (they are in the `support` schema, not `public`)
+SELECT table_schema, table_name
+FROM information_schema.tables
+WHERE table_schema = 'support'
+ORDER BY table_name;
+
+-- 2. sample records
 SELECT ticket_id, title, status, priority, category, created_by, created_at
 FROM support.tickets
 ORDER BY ticket_id;
@@ -87,51 +85,106 @@ SELECT message_id, ticket_id, author, author_role, created_at,
        left(message_text, 60) AS message_preview
 FROM support.ticket_messages
 ORDER BY ticket_id, message_id;
-```
 
-To evidence the foreign key in the same screenshot:
-
-```sql
+-- 3. proof of the foreign key -- worth having in the same image
 SELECT conname, pg_get_constraintdef(oid) AS definition
 FROM pg_constraint
-WHERE conrelid = 'support.ticket_messages'::regclass
-  AND contype = 'f';
+WHERE conrelid = 'support.ticket_messages'::regclass AND contype = 'f';
 ```
 
-## Test evidence
+Save as `docs/screenshot-lakebase.png`.
 
-If the submission form allows an appendix, `python scripts/verify_lakebase.py`
-prints a pass/fail report against the live instance covering the four things the
-brief asks you to confirm — existing tickets load, a ticket can be created, a
-message can be added, a status can be updated — plus proof that each change
-survives a re-read on a new connection, which is the "changes remain after
-refreshing" requirement stated precisely.
+## Step 2 — Commit the screenshots
 
-## Supporting detail
+This is what puts them inside the zip automatically:
 
-**Why the credential choice matters.** A connection string whose password is a
-generated OAuth token works on the first request and then fails roughly an hour
-later. A native Postgres role password does not expire, which is what an
-always-on app needs. The app supports both shapes and logs which one is active at
-startup, and it also supports having no password at all — in that mode it mints a
-token from its own service-principal identity at SQLAlchemy's `do_connect` event,
-so every new physical connection gets a fresh credential and nothing above the
-engine layer knows credentials exist.
+```bash
+cd lakebase-ai-support-app
+git add docs/screenshot-app.png docs/screenshot-lakebase.png
+git commit -m "Add submission screenshots"
+git push
+```
 
-**Keeping the credential out of the repo.** `app.yaml` names the secret rather
-than holding it (`valueFrom: lakebase-url`), which means the deployable artifact
-is safe to commit and share. The failure paths were written with the same care as
-the happy path: a malformed connection string produces a message naming the
-missing piece without echoing the value, and `/api/health` reports host,
-database, role, schema and auth mode but never the password.
+## Step 3 — Build the zip
 
-**Where the schema does the work.** Three layers validate every write: the
-browser, the Python validators, and `CHECK` constraints in Postgres. The third
-layer is the one that actually matters — it holds even if someone writes to the
-table from a notebook, and the app maps constraint violations back to friendly
-per-field messages rather than surfacing a 500.
+```bash
+git archive --format=zip --output=../nexus-support-source.zip HEAD
+```
 
-**What I would build after triage.** Full-text search using `pg_trgm` instead of
-`ILIKE`, SLA timers driven off `ticket_status_history`, and a Unity Catalog
-dashboard over the CDF-published tables — the audit table exists partly because
-it is what an SLA report would need.
+Use `git archive` rather than zipping the folder by hand. It includes **only
+committed, non-ignored files**, so `.venv/`, `__pycache__/` and any local `.env`
+cannot end up in the submission.
+
+### What the zip will contain
+
+```
+README.md                  full documentation and deployment guide
+REFLECTION.md              this file
+app.py                     entry point
+app.yaml                   Databricks Apps config (no credentials)
+requirements.txt
+env.example                local-dev template, no values
+.gitignore
+
+support_app/               config, db, repository, errors, routes, factory
+sql/001_schema.sql         tables, FK, indexes, trigger, view, CDF readiness
+sql/002_seed.sql           idempotent demo data
+static/                    css, js, logo/favicon SVGs
+templates/index.html
+scripts/                   check_api, check_sql, check_connection, verify_lakebase
+docs/                      your two screenshots
+```
+
+## Step 4 — Final safety check
+
+Confirm no credential is in the zip. This should print nothing but synthetic
+test values:
+
+```bash
+git grep -nE "postgresql://[A-Za-z0-9_]+:[^@]+@" -- .
+```
+
+Expected hits, both in `scripts/check_api.py`, both fake:
+`fake-not-a-real-password` and `svc_user:pw@/` (a deliberately-malformed test
+case). Anything else, stop and investigate.
+
+Your real connection string lives only in your local `.env` (git-ignored) and in
+the Databricks secret scope. `app.yaml` contains only the secret's *name*.
+
+## Step 5 — Submit
+
+| Item | What to provide |
+| --- | --- |
+| Databricks App URL | From **Compute → Apps → your app** |
+| Source code, zipped | `nexus-support-source.zip` from Step 3 |
+| Screenshot of the app | `docs/screenshot-app.png` |
+| Screenshot of Lakebase | `docs/screenshot-lakebase.png` |
+| Reflection | Part 1 above, in your own words |
+
+---
+
+## Optional extras, if you want them
+
+**Test evidence.** `python scripts/verify_lakebase.py` prints a pass/fail report
+against your live instance covering the four things the brief asks you to
+confirm — tickets load, one can be created, a message added, a status changed —
+plus proof each change survives a re-read on a new connection, which is the
+"changes remain after refreshing" requirement stated precisely. It cleans up
+after itself.
+
+**Bonus challenges already met** (worth naming in your submission):
+
+| Bonus | Where |
+| --- | --- |
+| Priority **and** category | Both, enforced by `CHECK` constraints, editable in the detail pane |
+| Filtering by status | Multi-select chips with live counts, plus priority, category, search and four sort orders |
+| Validation and helpful errors | Three layers — browser, `errors.py`, `CHECK` constraints — naming the field and reporting all problems at once |
+| Ticket statistics | Six live tiles including mean resolution time computed in SQL |
+| Delete with confirmation | Modal naming the ticket and message count, requires typing `DELETE` |
+| Improved visual design | Design system built from the product mark's own palette |
+
+**Beyond the brief**, if asked what else you did: an append-only
+`ticket_status_history` audit table, automatic system messages on status change,
+a `/api/health` readiness probe, identity taken from the signed-in Databricks
+user, CDF readiness, and 469 automated checks (97 API + 372 SQL validated
+against PostgreSQL's own parser).

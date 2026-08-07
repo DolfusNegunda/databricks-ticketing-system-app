@@ -156,6 +156,10 @@
         <svg class="icon"><use href="#i-back"/></svg><span>All tickets</span>
       </button>
 
+      <!-- Everything above the composer scrolls together; the composer itself
+           sits outside this element so it can never overlap the thread. -->
+      <div class="detail__scroll" id="detail-scroll">
+
       <header class="detail__head">
         <div class="detail__heading">
           <span class="ticket-id" id="detail-id"></span>
@@ -191,6 +195,8 @@
         </h2>
         <ol class="messages" id="messages"></ol>
       </section>
+
+      </div><!-- /.detail__scroll -->
 
       <form class="composer" id="composer" novalidate>
         <label class="field">

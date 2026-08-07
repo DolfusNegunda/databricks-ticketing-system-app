@@ -573,7 +573,8 @@
     try {
       state.detail = await request(`/tickets/${ticketId}`);
       renderDetail();
-      if (!silent) $('detail').scrollTop = 0;
+      // The scroll region is the inner wrapper now, not the article itself.
+      if (!silent) $('detail-scroll').scrollTop = 0;
     } catch (error) {
       state.detail = null;
       renderDetail();
