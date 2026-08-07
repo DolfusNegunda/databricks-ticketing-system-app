@@ -69,6 +69,14 @@
 /* --------------------------------------------------------------- base ---- */
 *, *::before, *::after { box-sizing: border-box; }
 
+/* The hidden attribute has to beat every component's own display rule.
+   The browser's [hidden] { display: none } lives in the UA stylesheet, so ANY
+   author rule setting display -- .banner, .empty, .detail, .btn all do -- wins
+   over it and leaves "hidden" elements on screen: a dismissed banner that never
+   goes away, an empty-state under a full list, a placeholder overlapping the
+   content it is meant to replace. This one line is what makes el.hidden work. */
+[hidden] { display: none !important; }
+
 html, body { height: 100%; }
 
 body {
@@ -823,7 +831,6 @@ select {
 
 /* --------------------------------------------------------------- modal --- */
 .modal { position: fixed; inset: 0; z-index: 90; display: grid; place-items: center; padding: 20px; }
-.modal[hidden] { display: none; }
 
 .modal__backdrop {
   position: absolute;

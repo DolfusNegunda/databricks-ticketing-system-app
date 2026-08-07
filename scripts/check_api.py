@@ -214,6 +214,35 @@ for label, response, status in (
           response.status_code == status and "error" in response.get_json(),
           response.status_code)
 
+print("\n== the hidden attribute actually hides ==")
+# Learned the hard way: [hidden] lives in the UA stylesheet, so any author rule
+# setting `display` silently beats it. That left the error banner permanently on
+# screen, the empty state under a full list, and the "Select a ticket"
+# placeholder overlapping the ticket it was meant to replace.
+css = (ROOT / "static" / "css" / "app.css").read_text(encoding="utf-8")
+template = (ROOT / "templates" / "index.html").read_text(encoding="utf-8")
+
+import re  # noqa: E402
+
+global_rule = re.search(r"\[hidden\]\s*\{[^}]*display:\s*none\s*!important", css)
+check("a global [hidden] { display: none !important } rule exists", bool(global_rule))
+
+hidden_ids = re.findall(r'id="([a-z0-9-]+)"[^>]*\shidden[\s>]', template)
+check("template still relies on the hidden attribute", len(hidden_ids) >= 5, hidden_ids)
+print(f"        elements toggled via hidden: {', '.join(hidden_ids)}")
+
+# Any class that sets `display` and is also toggled with hidden depends on the
+# rule above; without it those specific elements silently stay visible.
+at_risk = [
+    name for name in ("banner", "empty", "detail", "detail-placeholder", "modal", "btn")
+    if re.search(rf"^\.{name}\s*(\{{|[^{{]*\{{)[^}}]*display:", css, re.M)
+]
+check(
+    "components that set display are covered by the global rule",
+    bool(global_rule),
+    f"display-setting classes toggled via hidden: {at_risk}",
+)
+
 print("\n== supplied connection string is parsed correctly ==")
 from support_app import config, db  # noqa: E402
 

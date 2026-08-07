@@ -507,13 +507,20 @@
     $('priority-control').value = ticket.priority;
     $('category-control').value = ticket.category;
 
+    // .filter(Boolean) is load-bearing: replaceChildren stringifies a null into
+    // the literal text "null" rather than skipping it, and both the Resolved
+    // entry and the status trail are conditional.
     $('detail-meta').replaceChildren(
-      metaEntry('Reported by', ticket.created_by, true),
-      metaEntry('Assigned to', ticket.assigned_to || 'Unassigned', Boolean(ticket.assigned_to)),
-      metaEntry('Created', absTime(ticket.created_at)),
-      metaEntry('Last updated', `${relTime(ticket.updated_at)} (${absTime(ticket.updated_at)})`),
-      ticket.resolved_at ? metaEntry('Resolved', absTime(ticket.resolved_at)) : null,
-      statusTrail(ticket.status_history),
+      ...[
+        metaEntry('Reported by', ticket.created_by, true),
+        metaEntry('Assigned to', ticket.assigned_to || 'Unassigned',
+                  Boolean(ticket.assigned_to)),
+        metaEntry('Created', absTime(ticket.created_at)),
+        metaEntry('Last updated',
+                  `${relTime(ticket.updated_at)} (${absTime(ticket.updated_at)})`),
+        ticket.resolved_at ? metaEntry('Resolved', absTime(ticket.resolved_at)) : null,
+        statusTrail(ticket.status_history),
+      ].filter(Boolean),
     );
 
     const messages = ticket.messages || [];
