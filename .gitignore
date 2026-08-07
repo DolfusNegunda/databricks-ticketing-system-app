@@ -23,3 +23,6 @@ desktop.ini
 
 # Databricks
 .databricks/
+
+# Personal submission checklist -- not part of the deliverable
+SUBMISSION.md

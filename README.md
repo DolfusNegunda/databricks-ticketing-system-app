@@ -9,7 +9,6 @@
   <p>
     <a href="https://ticketing-system-app-7474650241444565.aws.databricksapps.com/"><strong>Live app</strong></a>
     &nbsp;·&nbsp; <a href="REFLECTION.md">Reflection</a>
-    &nbsp;·&nbsp; <a href="SUBMISSION.md">Submission guide</a>
   </p>
 </div>
 
@@ -53,8 +52,8 @@ same rows can flow into Unity Catalog.
 | `docs/screenshot-app.png` | The deployed application |
 | `docs/screenshot-lakebase.png` | The Lakebase tables and sample records |
 
-Capture instructions and the exact SQL are in
-[SUBMISSION.md](SUBMISSION.md#step-1--take-the-two-screenshots).
+The SQL used for the Lakebase capture is in
+[Where the tables actually live](#where-the-tables-actually-live).
 
 ## Architecture
 
@@ -220,7 +219,8 @@ ticket and confirms the cascade. It cleans up after itself and leaves the demo
 data in place.
 
 Take your **Lakebase screenshot** now — the tables exist and have rows. The exact
-queries to run are in [SUBMISSION.md](SUBMISSION.md#step-1--take-the-two-screenshots).
+queries to run are in
+[Where the tables actually live](#where-the-tables-actually-live).
 
 You can also run the app locally at this point to see it working before you
 deploy:
