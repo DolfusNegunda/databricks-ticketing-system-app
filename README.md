@@ -316,6 +316,59 @@ the installed `databricks-sdk` (0.123.0) but has never been executed against a
 live instance — the connection-string path is the one that has actually run. Keep
 that in mind if you switch to it as a fallback.
 
+## Where the tables actually live
+
+There are two different places to look, and they answer different questions.
+
+**1. In Postgres — this is the real operational store.** The app reads and
+writes here on every request. Connect a SQL editor to the instance endpoint and
+query:
+
+```sql
+SELECT table_schema, table_name
+FROM information_schema.tables
+WHERE table_schema NOT IN ('pg_catalog', 'information_schema')
+ORDER BY 1, 2;
+
+SELECT * FROM support.tickets ORDER BY ticket_id;
+```
+
+> **The tables are in the `support` schema, not `public`.** Most browsers show
+> `public` by default, which makes them look absent. `LAKEBASE_SCHEMA` in
+> `app.yaml` controls this; set it to `public` if you would rather they sat
+> there.
+
+`GET /api/health` also reports live row counts straight from Postgres, which is
+the quickest confirmation that the app and your SQL client are looking at the
+same database.
+
+**2. In Unity Catalog — only after you start Change Data Feed.** Lakebase
+Postgres tables do not appear in Catalog Explorer on their own. CDF publishes
+them as Delta tables named `lb_<table>_history`, with `_pg_change_type`,
+`_pg_lsn`, `_pg_xid` and `_timestamp` metadata columns, refreshed roughly every
+15 seconds.
+
+To start it: **Lakebase tab → your instance → Lakebase CDF → Start**, choose the
+`databricks_postgres` database, then:
+
+| Field | Value |
+| --- | --- |
+| Schema | **`support`** — not `public`, which is the usual default |
+| Destination | your Unity Catalog catalog/schema |
+
+Two gotchas that make tables silently not appear in the CDF preview:
+
+- **`REPLICA IDENTITY FULL` must be set.** `sql/001_schema.sql` sets it, but
+  inside a `DO` block that swallows every error so it can never roll back the
+  schema — meaning a failure is silent by design. `scripts/verify_lakebase.py`
+  reports the real setting per table, and prints the `ALTER TABLE` statements to
+  run if any are not `FULL`.
+- **Empty tables are skipped** until their first insert. Not a problem here,
+  since the seed populates all three.
+
+Disabling CDF later is not free: changes made while it is off are not captured,
+and re-enabling triggers a full resync.
+
 ## Local development
 
 Covered by [Step 1](#step-1--prove-the-connection-works-locally): a venv, a

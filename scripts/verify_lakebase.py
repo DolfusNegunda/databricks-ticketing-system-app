@@ -123,6 +123,45 @@ trigger = scalar(
 )
 check("updated_at trigger installed", trigger >= 1, trigger)
 
+print("\n== Lakebase CDF readiness ==")
+# The schema sets REPLICA IDENTITY FULL inside a DO block that swallows every
+# error, so it can never roll back the tables. That makes a failure invisible --
+# and CDF needs this setting -- so confirm it actually took rather than assume.
+with db.get_engine().connect() as connection:
+    identities = dict(
+        connection.execute(
+            text(
+                """
+                SELECT relname, relreplident
+                FROM pg_class
+                WHERE relnamespace = to_regnamespace(:schema)
+                  AND relkind = 'r'
+                ORDER BY relname
+                """
+            ),
+            {"schema": config.LAKEBASE_SCHEMA},
+        ).all()
+    )
+
+not_full = [name for name, ident in identities.items() if ident != "f"]
+for name, ident in identities.items():
+    meaning = {"f": "FULL", "d": "DEFAULT (primary key only)",
+               "n": "NOTHING", "i": "INDEX"}.get(ident, ident)
+    print(f"        {name:>24}: {meaning}")
+
+if not_full:
+    print(
+        "\n        NOTE: CDF will publish only changed columns for the tables\n"
+        "        above that are not FULL. This does not affect the app. To fix,\n"
+        "        run as the table owner:\n"
+        + "".join(
+            f"          ALTER TABLE {config.LAKEBASE_SCHEMA}.{n} REPLICA IDENTITY FULL;\n"
+            for n in not_full
+        )
+    )
+else:
+    print("        all tables are REPLICA IDENTITY FULL -- ready for CDF")
+
 print("\n== seeded data meets the brief ==")
 listing = repository.list_tickets(limit=config.MAX_PAGE_SIZE)
 seeded = [t for t in listing["items"] if MARKER not in t["title"]]

@@ -146,6 +146,14 @@
       }
     }
 
+    if (response.ok && !path.startsWith('/health')) {
+      // Something worked, so a visible error banner is now out of date. The
+      // health check is a point-in-time snapshot: without this it latches on a
+      // transient failure (an endpoint waking from suspend) and keeps claiming
+      // Lakebase is unreachable while the app is demonstrably working.
+      clearStaleBanner();
+    }
+
     if (!response.ok) {
       const err = payload && payload.error ? payload.error : {};
       throw new ApiFailure(err.message || `Request failed (${response.status}).`, {
@@ -156,6 +164,16 @@
       });
     }
     return payload;
+  }
+
+  let staleBannerTimer = null;
+
+  function clearStaleBanner() {
+    const banner = $('banner');
+    if (!banner || banner.hidden) return;
+    clearTimeout(staleBannerTimer);
+    // Re-check rather than just hiding it: confirm recovery before saying so.
+    staleBannerTimer = setTimeout(() => checkHealth(), 200);
   }
 
   // ---------------------------------------------------------------- toasts --
